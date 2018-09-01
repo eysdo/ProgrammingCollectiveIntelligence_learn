@@ -50,6 +50,7 @@ critics = {
     'Toby': {'Snakes on a Plane': 4.5, 'You, Me and Dupree': 1.0,
              'Superman Returns': 4.0},
 }
+#欧氏距离
 def sim_distance(prefs,person1,person2):
     si = {}
     for item in prefs[person1]:
@@ -87,6 +88,28 @@ def sim_pearson(prefs,p1,p2):
     r = num / den
     return r
 #print(sim_pearson(critics,'Lisa Rose','Gene Seymour'))
+#余弦相似度
+def sim_cosine(prefs,p1,p2):
+    #把双方共同评价过的物品放入si字典
+    si = {}
+    for item in prefs[p1]:
+        if item in prefs[p2]:
+            si[item] = 1
+    n = len(si)
+    #如果p1和p2没有共同之处，则返回-1
+    if n == 0:
+        return -1
+    #求乘积之和
+    pSum = sum([prefs[p1][it]*prefs[p2][it] for it in si])
+    #求平方和
+    sum1Sq = sum([pow(prefs[p1][it],2) for it in si])
+    sum2Sq = sum([pow(prefs[p2][it],2) for it in si])
+    den = sqrt(sum1Sq) * sqrt(sum2Sq)
+    if den == 0:
+        return 0
+    r = pSum / den
+    return r
+#print(sim_cosine(critics,'Lisa Rose','Gene Seymour'))
 def topMatches(prefs,person,n=5,similarity=sim_pearson):
     scores = [(similarity(prefs,person,other),other) for other in prefs if other != person ]
     scores.sort()
@@ -117,4 +140,77 @@ def getRecommendations(prefs,person,similarity=sim_pearson):
     rankings.sort(reverse=True)
     return rankings
 #print(getRecommendations(critics,'Toby'))
-print(getRecommendations(critics,'Toby',similarity=sim_distance))
+#print(getRecommendations(critics,'Toby',similarity=sim_distance))
+def transformPrefs(prefs):
+    result = {}
+    for person in prefs:
+        for item in prefs[person]:
+            result.setdefault(item,{})
+            result[item][person] = prefs[person][item]
+    return result
+movies = transformPrefs(critics)
+#print(topMatches(movies,'Superman Returns'))
+#print(getRecommendations(movies,'Just My Luck'))
+#from pydelicious import get_popular,get_userposts,get_urlposts
+def calculateSimilarItems(prefs,n=10):
+    #建立字典，以给出与这些物品最为相近的所有其他物品
+    result = {}
+    #以物品为中心对偏好矩阵实施倒置处理
+    itemPrefs = transformPrefs(prefs)
+    c = 0
+    for item in itemPrefs:
+        c += 1
+        if c % 100 == 0:
+            print('{1} / {2}'.format(c,len(itemPrefs)))
+        #scores = topMatches(itemPrefs,item,n=n,similarity=sim_distance)
+        scores = topMatches(itemPrefs,item,n=n,similarity=sim_cosine)
+        result[item] = scores
+    return result
+itemsim = calculateSimilarItems(critics)
+#print(itemsim)
+#给予物品的推荐，使用余弦相似度
+def getRecommendationsItems(prefs,itemMatch,user):
+    userRatings = prefs[user]
+    scores = {}
+    totalSim = {}
+    #循环遍历由当前用户user评分的物品
+    for item, rating in userRatings.items():
+        #循环遍历与当前物品相似的物品
+        for similarity,item2 in itemMatch[item]:
+            #如果用户已经对当前物品做过评价，则将其忽略
+            if item2 in userRatings:continue
+            
+            #评价值与相似度的加权之和
+            scores.setdefault(item2,0)
+            scores[item2] += similarity * rating
+            #全部相似度之和
+            totalSim.setdefault(item2,0)
+            totalSim[item2] += similarity
+    rankings = [(score / totalSim[item],item) for item,score in scores.items()]
+    rankings.sort(reverse=True)
+    return rankings
+#print(getRecommendationsItems(critics,itemsim,'Toby'))
+def loadMovieLens(path=r'e:\python\ProgrammingCollectiveIntelligence\ch02'):
+    #获取影片标题
+    movies = {}
+    with open(path + '\\movies.csv') as f:
+        for line_no,line in enumerate(f):
+            if line_no == 0:
+                continue
+            id, title = line.split(',')[0:2]
+            movies[id] = title
+    #加载评分数据
+    prefs = {}
+    with open(path + '\\ratings.csv') as f:
+        for line_no,line in enumerate(f):
+            if line_no == 0:continue
+            user, movieid, rating, _ = line.split(',')
+            prefs.setdefault(user,{})
+            prefs[user][movies[movieid]] = float(rating)
+    return prefs
+prefs = loadMovieLens()
+#print(prefs)
+#print(getRecommendations(prefs,'87')[0:30])
+itemsim = calculateSimilarItems(prefs,n=50)
+#print(getRecommendationsItems(prefs,itemsim,'87')[0:30])
+
