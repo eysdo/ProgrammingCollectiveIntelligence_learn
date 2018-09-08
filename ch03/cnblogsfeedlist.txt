@@ -1,0 +1,4 @@
+http://feed.cnblogs.com/blog/sitehome/rss
+http://feed.cnblogs.com/blog/picked/rss
+http://feed.cnblogs.com/news/rss
+http://feed.cnblogs.com/kb/
